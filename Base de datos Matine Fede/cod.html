@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso Matiné</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+      background: #121212;
+      color: white;
+    }
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 2px solid white;
+      border-radius: 10px;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2em;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Control de Acceso - Matiné</h1>
+  <video id="preview"></video>
+  <div id="status">Escaneá un código QR...</div>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script type="module">
+    // Config Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_DOMINIO.firebaseapp.com",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_PROJECT_ID.appspot.com",
+      messagingSenderId: "TU_ID",
+      appId: "TU_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const statusDiv = document.getElementById("status");
+
+    const html5QrCode = new Html5Qrcode("preview");
+    const config = { fps: 10, qrbox: 250 };
+
+    function validarQR(code) {
+      const ref = doc(db, "invitados", code);
+      getDoc(ref).then((docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.acceso === true) {
+            statusDiv.innerHTML = `❌ Ya usó su entrada: ${data.nombre}`;
+            statusDiv.style.color = 'red';
+          } else {
+            updateDoc(ref, { acceso: true });
+            statusDiv.innerHTML = `✅ Acceso permitido: ${data.nombre}`;
+            statusDiv.style.color = 'lime';
+          }
+        } else {
+          statusDiv.innerHTML = "❌ Entrada inválida";
+          statusDiv.style.color = 'red';
+        }
+      });
+    }
+
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          qrCodeMessage => {
+            html5QrCode.stop();
+            validarQR(qrCodeMessage);
+            setTimeout(() => {
+              html5QrCode.start({ facingMode: "environment" }, config, qrCodeMessage => validarQR(qrCodeMessage));
+            }, 3000);
+          },
+          errorMessage => {
+            // Silenciar errores
+          }
+        );
+      }
+    });
+  </script>
+</body>
+</html>
